@@ -1,0 +1,64 @@
+- name: Automate CSI
+  hosts: localhost
+  become: true
+  tasks:
+
+    - name: Create a new ext4 primary partition
+      community.general.parted:
+        device: /dev/xvdf
+        number: 1
+        state: present
+        fs_type: ext4
+
+    - name: Create a ext4 filesystem on /dev/sdb1 and check disk blocks
+      community.general.filesystem:
+        fstype: ext4
+        dev: /dev/xvdf1
+        
+    - name: Mount up device
+      mount:
+        path: /var/log
+        src: /dev/xvdf1
+        fstype: ext4
+        state: present
+
+    - name: IP forwarding disable
+      ansible.builtin.shell:
+      cmd: sysctl -w net.ipv4.ip_forward=0
+
+    - name: Add login logout event
+      ansible.builtin.lineinfile:
+        path: /etc/audit/audit.rules
+        line: -w /var/log/lastlog -p wa -k logins
+    
+    - name: Add login logout event2
+      ansible.builtin.lineinfile:
+        path: /etc/audit/audit.rules
+        line: -w /var/run/faillock/ -p wa -k logins
+
+    - name: file deleting event
+      ansible.builtin.lineinfile:
+        path: /etc/audit/audit.rules
+        line: -a always,exit -F arch=b64 -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=4294967295 -k delete
+
+    - name: file deleting event2
+      ansible.builtin.lineinfile:
+        path: /etc/audit/audit.rules
+        line: -a always,exit -F arch=b32 -S unlink -S unlinkat -S rename -S renameat -F auid>=1000 -F auid!=4294967295 -k delete
+
+    - name: password expiration is 90 days
+      ansible.builtin.lineinfile:
+        path: /etc/login.defs
+        regexp: 'PASS_MAX_DAYS '
+        line: PASS_MAX_DAYS 90
+    
+    - name: password expiration is 90 days
+      ansible.builtin.lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: 'LogLevel '
+        line: LogLevel INFO
+
+    
+
+    
+      
